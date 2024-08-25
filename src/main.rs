@@ -30,11 +30,11 @@ struct Step {
     bodies: [Body; 3],
 }
 const TIME_STEP: f64 = 0.01;
-const STEPS: usize = 100000;
+const STEPS: u32 = 100000000;
 const GRAVITATIONAL_CONSTANT: f64 = 6.67430e-11; // G
 
-const ANIMATION_LENGTH: i32 = 60; // total seconds
-const ANIMATION_FPS: i32 = 60; // fps
+const ANIMATION_LENGTH: u32 = 30; // total seconds
+const ANIMATION_FPS: u32 = 40; // fps
 fn main() {
     let mut first = Body::new(Position {
         x: 0.3089693008,
@@ -43,7 +43,7 @@ fn main() {
     let mut second = Body::new(Position { x: -0.5, y: 0.0 });
     let mut third = Body::new(Position { x: 0.5, y: 0.0 });
 
-    let mut steps = Vec::<Step>::with_capacity(STEPS);
+    let mut steps = Vec::<Step>::with_capacity(STEPS as usize);
 
     for n in 0..STEPS {
         let mut new_step = Step {
@@ -75,7 +75,7 @@ fn main() {
                 }
             }
         }
-        // 更新位移
+        // 更新3个行星的位移
         for k in 0..3 {
             new_step.bodies[k].position.x += new_step.bodies[k].velocity.0 * TIME_STEP;
             new_step.bodies[k].position.y += new_step.bodies[k].velocity.1 * TIME_STEP;
@@ -84,24 +84,26 @@ fn main() {
         second = new_step.bodies[1].clone();
         third = new_step.bodies[2].clone();
 
-        if n % 1000 == 0 {
-            println!(
-                "Finished step {} ({:.08}, {:.08})",
-                n, first.position.x, first.position.y
-            );
-        }
+        // if n % (STEPS / (ANIMATION_LENGTH * ANIMATION_FPS)) == 0 {
+        //     println!(
+        //         "Finished step {} ({:.08}, {:.08})",
+        //         n, first.position.x, first.position.y
+        //     );
+        // }
 
-        if n % (STEPS / (ANIMATION_LENGTH * ANIMATION_FPS) as usize) == 0 {
+        if n % (STEPS / (ANIMATION_LENGTH * ANIMATION_FPS)) == 0 {
             steps.push(new_step);
         }
     }
 
     println!(
         "Finished simulating {} steps. Generating visualization...",
-        STEPS
+        STEPS,
     );
-
+    // 轨迹图
     graph_steps(&steps);
+    // 动图
+    animation_steps(&steps);
 }
 
 fn graph_steps(steps: &[Step]) {
@@ -152,4 +154,50 @@ fn graph_steps(steps: &[Step]) {
             .unwrap();
     }
     area.present().unwrap();
+}
+
+fn animation_steps(steps: &[Step]) {
+    println!("Generating animation...");
+
+    let area = BitMapBackend::gif("three_body.gif", (250, 250), 1)
+        .unwrap()
+        .into_drawing_area();
+
+    let mut chart = ChartBuilder::on(&area)
+        .build_cartesian_2d(-100..100, -100..100)
+        .unwrap();
+
+    for step in steps {
+        // println!("Rendering frame {}", step.step);
+        area.fill(&WHITE).unwrap();
+        chart.configure_mesh().draw().unwrap();
+
+        for i in 0..3 {
+            let color = match i {
+                0 => BLUE,
+                1 => GREEN,
+                2 => RED,
+                _ => BLACK,
+            };
+            chart
+                .draw_series([step.clone()].iter().map(|step| {
+                    Circle::new(
+                        (
+                            (step.bodies[i].position.x * 100.0).round() as i32,
+                            (step.bodies[i].position.y * 100.0).round() as i32,
+                        ),
+                        2,
+                        color.filled(),
+                    )
+                }))
+                .unwrap();
+        }
+        area.draw(&Text::new(
+            format!("T : {}", step.time.round() as u32),
+            (5, 5),
+            ("sans-serif", 12),
+        ))
+        .unwrap();
+        area.present().unwrap();
+    }
 }
