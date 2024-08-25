@@ -1,3 +1,5 @@
+use plotters::prelude::*;
+
 #[derive(Debug, Clone)]
 struct Position {
     x: f64,
@@ -21,6 +23,7 @@ impl Body {
     }
 }
 
+#[derive(Debug, Clone)]
 struct Step {
     time: f64,
     step: u32,
@@ -29,6 +32,9 @@ struct Step {
 const TIME_STEP: f64 = 0.01;
 const STEPS: usize = 100000;
 const GRAVITATIONAL_CONSTANT: f64 = 6.67430e-11; // G
+
+const ANIMATION_LENGTH: i32 = 60; // total seconds
+const ANIMATION_FPS: i32 = 60; // fps
 fn main() {
     let mut first = Body::new(Position {
         x: 0.3089693008,
@@ -84,5 +90,66 @@ fn main() {
                 n, first.position.x, first.position.y
             );
         }
+
+        if n % (STEPS / (ANIMATION_LENGTH * ANIMATION_FPS) as usize) == 0 {
+            steps.push(new_step);
+        }
     }
+
+    println!(
+        "Finished simulating {} steps. Generating visualization...",
+        STEPS
+    );
+
+    graph_steps(&steps);
+}
+
+fn graph_steps(steps: &[Step]) {
+    println!("Generating single PNG file...");
+    let area = BitMapBackend::new("three_body.png", (250, 255)).into_drawing_area();
+    area.fill(&WHITE).unwrap();
+    // 创建二维笛卡尔坐标系
+    let mut chart = ChartBuilder::on(&area)
+        .build_cartesian_2d(-100..100, -100..100)
+        .unwrap();
+    // 设置网格
+    chart.configure_mesh().draw().unwrap();
+
+    for i in 0..3 {
+        let color = match i {
+            0 => BLUE,
+            1 => GREEN,
+            2 => RED,
+            _ => BLACK,
+        };
+        chart
+            .draw_series(steps[1..].iter().map(|step| {
+                // 转化成⚪形式，画出
+                Circle::new(
+                    (
+                        (step.bodies[i].position.x * 100.0).round() as i32,
+                        (step.bodies[i].position.y * 100.0).round() as i32,
+                    ),
+                    1,
+                    color.filled(),
+                )
+            }))
+            .unwrap();
+    }
+    // 三个行星的初始位置
+    for i in 0..3 {
+        chart
+            .draw_series([steps[0].clone()].iter().map(|step| {
+                Circle::new(
+                    (
+                        (step.bodies[i].position.x * 100.0).round() as i32,
+                        (step.bodies[i].position.y * 100.0).round() as i32,
+                    ),
+                    1,
+                    BLACK.filled(),
+                )
+            }))
+            .unwrap();
+    }
+    area.present().unwrap();
 }
